@@ -13,11 +13,38 @@ export default function Home() {
   const [photo, setPhoto] = useState(null)
   const [statusMessage, setStatusMessage] = useState('')
   const [location, setLocation] = useState('')
+  const [locationId, setLocationId] = useState('')
+  const [locations, setLocations] = useState([])
 
   useEffect(() => {
     // Get user's location (you might want to implement geolocation)
     setLocation('Location: Not implemented yet')
+    
+    // Fetch available locations
+    fetchLocations()
   }, [])
+
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabaseClient
+        .from('locations')
+        .select('id, name')
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching locations:', error)
+        setStatusMessage('Error loading locations. Please check your database connection.')
+      } else {
+        setLocations(data || [])
+        if (data && data.length === 0) {
+          setStatusMessage('No locations found in database. Please add locations first.')
+        }
+      }
+    } catch (err) {
+      console.error('Network error fetching locations:', err)
+      setStatusMessage('Network error loading locations')
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -27,12 +54,18 @@ export default function Home() {
       return
     }
 
+    if (!locationId) {
+      setStatusMessage("Please select a location")
+      return
+    }
+
     try {
       const { data, error } = await supabaseClient
         .from("complaints")
         .insert([
           {
-            issue: issue
+            issue: issue,
+            location_id: locationId
           }
         ])
 
@@ -44,6 +77,7 @@ export default function Home() {
         setStatusMessage("Complaint submitted successfully")
         setIssue('')
         setPhoto(null)
+        setLocationId('')
       }
     } catch (err) {
       console.error('Network error:', err)
@@ -77,6 +111,22 @@ export default function Home() {
           <option value="lighting">Poor Lighting</option>
           <option value="vandalism">Vandalism or Damage</option>
           <option value="other">Other</option>
+        </select>
+
+        <label>Select Location:</label>
+        <select
+          value={locationId}
+          onChange={(e) => setLocationId(e.target.value)}
+          required
+        >
+          <option value="">
+            {locations.length === 0 ? 'Loading locations...' : 'Choose a location'}
+          </option>
+          {locations.map((loc) => (
+            <option key={loc.id} value={loc.id}>
+              {loc.name}
+            </option>
+          ))}
         </select>
 
         <label>Upload Photo (Optional):</label>
